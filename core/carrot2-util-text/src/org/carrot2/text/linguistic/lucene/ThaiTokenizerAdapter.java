@@ -17,12 +17,9 @@ import java.io.Reader;
 import java.text.BreakIterator;
 import java.util.Locale;
 
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.standard.StandardTokenizer;
-import org.apache.lucene.analysis.th.ThaiWordFilter;
+import org.apache.lucene.analysis.th.ThaiTokenizer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.TypeAttribute;
-import org.apache.lucene.util.Version;
 import org.carrot2.text.analysis.ITokenizer;
 import org.carrot2.text.util.MutableCharArray;
 import org.carrot2.util.ExceptionUtils;
@@ -32,11 +29,11 @@ import org.carrot2.util.ExceptionUtils;
  */
 public final class ThaiTokenizerAdapter implements ITokenizer
 {
-    private TokenStream wordTokenFilter;
     private CharTermAttribute term = null;
     private TypeAttribute type = null;
 
     private final MutableCharArray tempCharSequence;
+    private ThaiTokenizer tokenizer;
 
     public ThaiTokenizerAdapter()
     {
@@ -48,7 +45,7 @@ public final class ThaiTokenizerAdapter implements ITokenizer
 
     public short nextToken() throws IOException
     {
-        final boolean hasNextToken = wordTokenFilter.incrementToken();
+        final boolean hasNextToken = tokenizer.incrementToken();
         if (hasNextToken)
         {
             final char [] image = term.buffer();
@@ -57,6 +54,7 @@ public final class ThaiTokenizerAdapter implements ITokenizer
 
             short flags = 0;
             final String typeString = type.type();
+            System.out.println(typeString);
             if (typeString.equals("<SOUTHEAST_ASIAN>") || typeString.equals("<ALPHANUM>"))
             {
                 flags = ITokenizer.TT_TERM;
@@ -80,17 +78,17 @@ public final class ThaiTokenizerAdapter implements ITokenizer
         array.reset(term.buffer(), 0, term.length());
     }
 
-    @SuppressWarnings("deprecation")
     public void reset(Reader input) throws IOException
     {
         assert input != null;
         try
         {
-            this.wordTokenFilter = new ThaiWordFilter(Version.LUCENE_CURRENT,
-                new StandardTokenizer(Version.LUCENE_CURRENT, input));
-            this.term = wordTokenFilter.addAttribute(CharTermAttribute.class);
-            this.type = wordTokenFilter.addAttribute(TypeAttribute.class);
-            this.wordTokenFilter.reset();
+            this.tokenizer = new ThaiTokenizer();
+            tokenizer.setReader(input);
+
+            this.term = tokenizer.addAttribute(CharTermAttribute.class);
+            this.type = tokenizer.addAttribute(TypeAttribute.class);
+            this.tokenizer.reset();
         }
         catch (Exception e)
         {
