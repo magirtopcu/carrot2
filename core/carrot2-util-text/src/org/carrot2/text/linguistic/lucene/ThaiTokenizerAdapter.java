@@ -14,12 +14,9 @@ package org.carrot2.text.linguistic.lucene;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.text.BreakIterator;
-import java.util.Locale;
 
 import org.apache.lucene.analysis.th.ThaiTokenizer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-import org.apache.lucene.analysis.tokenattributes.TypeAttribute;
 import org.carrot2.text.analysis.ITokenizer;
 import org.carrot2.text.util.MutableCharArray;
 import org.carrot2.util.ExceptionUtils;
@@ -30,7 +27,6 @@ import org.carrot2.util.ExceptionUtils;
 public final class ThaiTokenizerAdapter implements ITokenizer
 {
     private CharTermAttribute term = null;
-    private TypeAttribute type = null;
 
     private final MutableCharArray tempCharSequence;
     private ThaiTokenizer tokenizer;
@@ -52,22 +48,7 @@ public final class ThaiTokenizerAdapter implements ITokenizer
             final int length = term.length();
             tempCharSequence.reset(image, 0, length);
 
-            short flags = 0;
-            final String typeString = type.type();
-            System.out.println(typeString);
-            if (typeString.equals("<SOUTHEAST_ASIAN>") || typeString.equals("<ALPHANUM>"))
-            {
-                flags = ITokenizer.TT_TERM;
-            }
-            else if (typeString.equals("<NUM>"))
-            {
-                flags = ITokenizer.TT_NUMERIC;
-            }
-            else
-            {
-                flags = ITokenizer.TT_PUNCTUATION;
-            }
-            return flags;
+            return ITokenizer.TT_TERM;
         }
 
         return ITokenizer.TT_EOF;
@@ -87,7 +68,6 @@ public final class ThaiTokenizerAdapter implements ITokenizer
             tokenizer.setReader(input);
 
             this.term = tokenizer.addAttribute(CharTermAttribute.class);
-            this.type = tokenizer.addAttribute(TypeAttribute.class);
             this.tokenizer.reset();
         }
         catch (Exception e)
@@ -102,10 +82,7 @@ public final class ThaiTokenizerAdapter implements ITokenizer
     public static boolean platformSupportsThai()
     {
         try {
-            // Check if Thai break iteration is supported, code taken from Lucene's ThaiWordFilter. 
-            final BreakIterator proto = BreakIterator.getWordInstance(new Locale("th"));
-            proto.setText("ภาษาไทย");
-            return proto.isBoundary(4);
+           return ThaiTokenizer.DBBI_AVAILABLE; 
         } catch (Throwable e) {
             return false;
         }
