@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
+	<classpathentry exported="true" kind="lib" path="lucene-join-5.0.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="lucene-backward-codecs-5.0.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="lucene-queries-5.0.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="lucene-queryparser-5.0.0.jar"/>
