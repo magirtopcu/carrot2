@@ -17,6 +17,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang.StringUtils;
 import org.carrot2.core.Cluster;
@@ -42,10 +43,16 @@ import org.eclipse.swt.browser.Browser;
 import org.eclipse.swt.browser.BrowserFunction;
 import org.eclipse.swt.browser.LocationAdapter;
 import org.eclipse.swt.browser.LocationEvent;
+import org.eclipse.swt.events.ControlAdapter;
+import org.eclipse.swt.events.ControlEvent;
+import org.eclipse.swt.events.DisposeEvent;
+import org.eclipse.swt.events.DisposeListener;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Listener;
 import org.eclipse.ui.browser.IWorkbenchBrowserSupport;
 import org.eclipse.ui.part.Page;
 import org.eclipse.ui.progress.UIJob;
@@ -68,6 +75,11 @@ public abstract class AbstractBrowserVisualizationViewPage extends Page
     protected static final int BROWSER_SELECTION_DELAY = 250;
 
     /**
+     * Delay between the sizing event after the container is initialized.
+     */
+    protected static final int BROWSER_CLIENTSIZE_DELAY = 250;
+
+    /**
      * The editor associated with this page.
      */
     public final SearchEditor editor;
@@ -87,26 +99,80 @@ public abstract class AbstractBrowserVisualizationViewPage extends Page
      */
     private final String entryPageUri;
 
+    private final AtomicInteger view = new AtomicInteger();
+
     /**
      * This visualization's logger.
      */
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
+    private final Logger logger = LoggerFactory.getLogger(this.getClass().getName() + ".view_" + view.incrementAndGet());
 
     /**
      * Reloading XML data (with cause).
      */
+    // TODO: CARROT-1090
     private class ReloadXMLJob extends PostponableJob {
         public ReloadXMLJob(final String origin)
         {
             super(new UIJob("Browser refresh [" + origin + "]...") {
                 public IStatus runInUIThread(IProgressMonitor monitor)
                 {
-                    logger.debug("Browser refresh [" + origin + "]");
                     return reloadDataXml();
                 }
             });
         }
     };
+
+    /**
+     * Client size update job.
+     */
+    private class UpdateClientSizeJob extends PostponableJob
+    {
+        private volatile Rectangle clientArea;
+
+        public UpdateClientSizeJob()
+        {
+            setJob(new UIJob("UpdateClientSize")
+            {
+                public IStatus runInUIThread(IProgressMonitor monitor)
+                {
+                    if (getBrowser().isDisposed())
+                    {
+                        logger.warn("Browser disposed.");
+                        return Status.OK_STATUS;
+                    }
+
+                    Rectangle r = clientArea;
+                    if (r == null)
+                    {
+                        logger.warn("Area is null?");
+                        return Status.OK_STATUS;
+                    }
+
+                    if (isBrowserInitialized())
+                    {
+                        logger.info("updateSize(): " + clientArea);
+                        getBrowser().execute(
+                            "javascript:updateSize(" + clientArea.width + ", "
+                                + clientArea.height + ")");
+                    }
+                    else
+                    {
+                        reschedule(BROWSER_CLIENTSIZE_DELAY);
+                    }
+
+                    return Status.OK_STATUS;
+                }
+            });
+        }
+
+        public void update(Rectangle clientArea)
+        {
+            this.clientArea = clientArea;
+            reschedule(BROWSER_CLIENTSIZE_DELAY);
+        }
+    };
+
+    private UpdateClientSizeJob updateClientSizeJob = new UpdateClientSizeJob();
 
     /**
      * Selection refresh job.
@@ -225,8 +291,15 @@ public abstract class AbstractBrowserVisualizationViewPage extends Page
         // If the page has not finished loading, reschedule.
         if (!browserInitialized)
         {
-            logger.debug("Reloading XML rescheduled: browser not ready.");
-            new ReloadXMLJob("delaying").reschedule(BROWSER_REFRESH_DELAY);
+            if (!browser.isVisible())
+            {
+              new ReloadXMLJob("not visible").reschedule(BROWSER_REFRESH_DELAY);
+            }
+            else
+            {
+              logger.debug("Reloading XML rescheduled: browser not ready.");
+              new ReloadXMLJob("delaying").reschedule(BROWSER_REFRESH_DELAY);
+            }
             return Status.OK_STATUS;
         }
 
@@ -268,7 +341,7 @@ public abstract class AbstractBrowserVisualizationViewPage extends Page
      * 
      */
     @Override
-    public void createControl(Composite parent)
+    public void createControl(final Composite parent)
     {
         /*
          * Open the browser and redirect it to the internal HTTP server.
@@ -343,17 +416,42 @@ public abstract class AbstractBrowserVisualizationViewPage extends Page
                     openURL(event.location);
                 }
             }
-        });            
+        });
+
+        browser.addDisposeListener(new DisposeListener()
+        {
+            @Override
+            public void widgetDisposed(DisposeEvent e)
+            {
+                logger.debug("Browser disposed.");
+            }
+        });
+
+        browser.addControlListener(new ControlAdapter()
+        {
+            @Override
+            public void controlResized(ControlEvent e)
+            {
+                updateClientSize();
+            }
+        });
 
         editor.getSearchResult().addListener(editorSyncListener);
-        editor.getSite().getSelectionProvider().addSelectionChangedListener(
-            selectionListener);
+        editor.getSite().getSelectionProvider().addSelectionChangedListener(selectionListener);
     }
 
     /**
      * Invoked when the browser successfully embedded the visualization.
      */
-    protected void onBrowserReady() {}
+    protected void onBrowserReady() {
+        updateClientSize();
+    }
+
+    private void updateClientSize() {
+        Rectangle clientArea = browser.getClientArea();
+        logger.debug("Updating client size: " + clientArea);
+        updateClientSizeJob.update(clientArea);
+    }
 
     @Override
     public Control getControl()
@@ -413,19 +511,6 @@ public abstract class AbstractBrowserVisualizationViewPage extends Page
     {
         return browser != null && browserInitialized;
     }
-
-    void updateSize(Rectangle clientArea)
-    {
-        if (isBrowserInitialized()) {
-            if (!getBrowser().isDisposed()) {
-                getBrowser().execute("javascript:updateSize("
-                    + clientArea.width + ", " + clientArea.height + ")");
-            } else {
-                logger.warn("Browser disposed: " + this);
-            }
-        }
-    }    
-    
 
     /**
      * 
