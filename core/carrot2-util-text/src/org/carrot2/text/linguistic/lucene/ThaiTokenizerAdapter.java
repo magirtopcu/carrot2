@@ -22,7 +22,7 @@ import org.carrot2.text.util.MutableCharArray;
 import org.carrot2.util.ExceptionUtils;
 
 /**
- * Thai tokenizer implemented using Lucene's {@link ThaiWordFilter}.
+ * Thai tokenizer implemented using Lucene's {@link ThaiTokenizer}.
  */
 public final class ThaiTokenizerAdapter implements ITokenizer
 {
