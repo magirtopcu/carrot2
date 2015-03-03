@@ -12,16 +12,12 @@
 
 package org.carrot2.workbench.vis.aduna;
 
-import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.EventQueue;
 import java.awt.Frame;
-import java.awt.Toolkit;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.io.*;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.*;
 
@@ -384,8 +380,6 @@ final class AdunaClusterMapViewPage extends Page
             .addSelectionChangedListener(selectionListener);
     }
 
-    static AtomicBoolean initOnce = new AtomicBoolean();
-    
     /*
      * 
      */
@@ -417,11 +411,6 @@ final class AdunaClusterMapViewPage extends Page
         embedded = new Composite(scrollable, SWT.NO_BACKGROUND | SWT.EMBEDDED);
         embedded.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
-        EventQueue q = Toolkit.getDefaultToolkit().getSystemEventQueue();
-        if (!initOnce.getAndSet(true)) {
-          q.push(new com.carrotsearch.debug.EventQueue());
-        }
-        
         final Frame frame = SWT_AWT.new_Frame(embedded);
         frame.setLayout(new java.awt.BorderLayout());
 
@@ -431,18 +420,14 @@ final class AdunaClusterMapViewPage extends Page
 
         scrollPanel.setBorder(BorderFactory.createEmptyBorder());
         frame.add(scrollPanel, java.awt.BorderLayout.CENTER);
-        frame.add(new JButton("Foo"), java.awt.BorderLayout.NORTH);
 
         final ClusterMapFactory factory = ClusterMapFactory.createFactory();
         final ClusterMap clusterMap = factory.createClusterMap();
         final ClusterMapMediator mapMediator = factory.createMediator(clusterMap);
         this.mapMediator = mapMediator;
 
-        final JPanel panel = new JPanel(new BorderLayout());
         final ClusterGraphPanel graphPanel = mapMediator.getGraphPanel();
-        panel.add(graphPanel, BorderLayout.CENTER);
-        panel.add(new JButton("boo"), BorderLayout.SOUTH);
-        scrollPanel.setViewportView(panel);
+        scrollPanel.setViewportView(graphPanel);
 
         scrollable.addControlListener(new ControlAdapter()
         {
