@@ -15,7 +15,7 @@
 tools.dir=${carrot2.master.basedir}/.tools
 
 # Clover for Ant. Generate test coverage reports (license required).
-clover.home=${tools.dir}/clover-ant-2.6.3
+clover.home=${tools.dir}/clover-ant-4.0.3
 clover.enabled=false
 
 # PMD. Required to generate code duplication reports.
@@ -47,7 +47,7 @@ wt.headless=true
 
 # Workbench PDE Build and tests. Note the unusual layout of folders below -- 
 # they have the distribution version name and an /eclipse *subfolder*.
-target.platform=${tools.dir}/rcp/3.7.1
+target.platform=${tools.dir}/rcp/4.4.1
 eclipse.home=${target.platform}/eclipse
 
 # Workbench distribution (locally built). Your local platform by default, but can
