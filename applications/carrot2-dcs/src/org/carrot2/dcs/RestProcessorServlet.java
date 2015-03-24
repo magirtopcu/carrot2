@@ -17,11 +17,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -66,6 +70,7 @@ import org.carrot2.util.resource.ResourceLookup.Location;
 import org.carrot2.util.resource.ServletContextLocator;
 import org.carrot2.util.xslt.NopURIResolver;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -405,18 +410,53 @@ public final class RestProcessorServlet extends HttpServlet
         }
 
         // Everything else is identical for POST and GET.
-        final Map<String, Object> parameters = Maps.newHashMap();
-        @SuppressWarnings("unchecked")
-        final Enumeration<String> parameterNames = (Enumeration<String>) request.getParameterNames();
-        while (parameterNames.hasMoreElements()) {
-            final String key = parameterNames.nextElement();
-            if (DCS_C2STREAM.equals(key))
-            {
-                continue;
+        final Map<String, Object> parameters = processHttpParameters(request);
+        processRequest(request, response, input, parameters);
+    }
+
+    private static Map<String, Object> processHttpParameters(HttpServletRequest request) {
+      final Map<String, Object> parameters = Maps.newHashMap();
+      @SuppressWarnings("unchecked")
+      final Enumeration<String> parameterNames = (Enumeration<String>) request.getParameterNames();
+      final Set<String> dynamicMapKeys = new HashSet<>();
+      while (parameterNames.hasMoreElements()) {
+          final String key = parameterNames.nextElement();
+          if (DCS_C2STREAM.equals(key))
+          {
+              continue;
+          }
+          
+          final String paramValue = request.getParameter(key);
+
+          // Create maps dynamically from flat parameters starting with 
+          // "map.KEY.entry=value".
+          if (key.startsWith("map.")) {
+            ArrayDeque<String> components = new ArrayDeque<String>(Arrays.asList(key.split("\\.")));
+            if (components.size() < 3) {
+              throw new RuntimeException("This doesn't look like a dynamic map key-value entry: " + key);
             }
-            parameters.put(key, request.getParameter(key));
-        }
-        processRequest(response, input, parameters);
+
+            components.removeFirst();
+            String entryKey = components.removeLast();
+            String mapKey = Joiner.on(".").join(components);
+            if (dynamicMapKeys.add(mapKey)) {
+              if (parameters.containsKey(mapKey)) {
+                // Parameter already exists, we can't create a map entry for it.
+                throw new RuntimeException("Can't create dynamic map for key: "
+                    + mapKey + " because such an attribute already exists.");
+              }
+              
+              parameters.put(mapKey, new HashMap<>());
+            }
+            
+            @SuppressWarnings("unchecked")
+            Map<String, String> m = (Map<String, String>) parameters.get(mapKey);
+            m.put(entryKey, paramValue);
+          } else {
+            parameters.put(key, paramValue);
+          }
+      }
+      return parameters;
     }
 
     /**
@@ -478,7 +518,7 @@ public final class RestProcessorServlet extends HttpServlet
             }
         }
 
-        processRequest(response, input, parameters);
+        processRequest(request, response, input, parameters);
     }
 
     /**
@@ -489,14 +529,16 @@ public final class RestProcessorServlet extends HttpServlet
      * @throws IOException
      */
     @SuppressWarnings("unchecked")
-    private void processRequest(HttpServletResponse response, 
-        ProcessingResult input, final Map<String, Object> parameters) 
+    private void processRequest(HttpServletRequest request,
+                                HttpServletResponse response, 
+                                ProcessingResult input, 
+                                final Map<String, Object> parameters) 
         throws IOException
     {
         // Remove useless parameters, we don't want them to get to the attributes map
         parameters.remove("input-type");
         parameters.remove("submit");
-
+        
         // Bind request parameters to the request model
         final DcsRequestModel requestModel = new DcsRequestModel();
 
