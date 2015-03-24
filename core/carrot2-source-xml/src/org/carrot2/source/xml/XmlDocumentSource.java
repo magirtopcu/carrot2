@@ -14,6 +14,7 @@ package org.carrot2.source.xml;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -119,6 +120,15 @@ public class XmlDocumentSource extends ProcessingComponentBase implements IDocum
     @Level(AttributeLevel.MEDIUM)
     @Group(XML_TRANSFORMATION)
     public IResource xslt;
+
+    /**
+     * Catchall for all input attributes.
+     */
+    @Input
+    @Processing
+    @Attribute(key = AttributeNames.ATTRIBUTE_MAP)
+    @Internal(configuration = false)
+    public Map<String, Object> allAttributes;
 
     /**
      * Values for custom placeholders in the XML URL. If the type of resource provided in
@@ -257,8 +267,17 @@ public class XmlDocumentSource extends ProcessingComponentBase implements IDocum
         {
             title = null;
 
-            final ProcessingResult processingResult = xmlDocumentSourceHelper
-                .loadProcessingResult(openResource(xml), resolveStylesheet(),
+            final Map<String, String> xsltParameters = new HashMap<>(this.xsltParameters);
+            for (Map.Entry<String, Object>  e : allAttributes.entrySet()) {
+              if (e.getValue() instanceof String) {
+                xsltParameters.put(e.getKey(), (String) e.getValue());
+              }
+            }
+
+            final ProcessingResult processingResult = 
+                xmlDocumentSourceHelper.loadProcessingResult(
+                    openResource(xml), 
+                    resolveStylesheet(),
                     xsltParameters);
 
             query = (String) processingResult.getAttributes().get(AttributeNames.QUERY);
@@ -333,6 +352,7 @@ public class XmlDocumentSource extends ProcessingComponentBase implements IDocum
             // perform substitution of known attributes
             final Map<String, Object> attributes = Maps.newHashMap();
 
+            attributes.putAll(this.allAttributes);
             attributes.put("query", (query != null ? query : ""));
             attributes.put("results", (results != -1 ? results : ""));
             attributes.putAll(xmlParameters);

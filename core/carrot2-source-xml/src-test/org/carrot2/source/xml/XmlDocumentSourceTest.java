@@ -12,9 +12,12 @@
 
 package org.carrot2.source.xml;
 
+import java.io.File;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
 import org.carrot2.core.Cluster;
 import org.carrot2.core.Controller;
@@ -33,6 +36,8 @@ import com.google.common.base.Function;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.Files;
 
 /**
  * Test cases for {@link XmlDocumentSource}.
@@ -131,12 +136,35 @@ public class XmlDocumentSourceTest extends DocumentSourceTestBase<XmlDocumentSou
         xsltParameters.put("snippet-field", "snippet");
         xsltParameters.put("url-field", "url");
 
-        processingAttributes.put(AttributeUtils.getKey(XmlDocumentSource.class, "xml"),
-            xml);
-        processingAttributes.put(AttributeUtils.getKey(XmlDocumentSource.class, "xslt"),
-            xslt);
-        processingAttributes.put(AttributeUtils.getKey(XmlDocumentSource.class,
-            "xsltParameters"), xsltParameters);
+        processingAttributes.put(AttributeUtils.getKey(XmlDocumentSource.class, "xml"), xml);
+        processingAttributes.put(AttributeUtils.getKey(XmlDocumentSource.class, "xslt"), xslt);
+        processingAttributes.put(AttributeUtils.getKey(XmlDocumentSource.class, "xsltParameters"), xsltParameters);
+        final int documentCount = runQuery();
+        assertTransformedDocumentsEqual(documentCount);
+    }
+
+    @Test
+    public void testInputParameterPassing() throws Exception
+    {
+        IResource xml = resourceLocator.getFirst("/xml/custom-parameters-required.xml");
+        IResource xslt = resourceLocator.getFirst("/xsl/custom-xslt.xsl");
+
+        String fileName = "input.xml";
+        File tempDir = newTempDir();
+        File tempFile = new File(tempDir, fileName);
+        try (InputStream is = xml.open()) {
+          ByteStreams.copy(xml.open(), Files.newOutputStreamSupplier(tempFile));
+        }
+
+        processingAttributes.put("id-field", "number");
+        processingAttributes.put("title-field", "heading");
+        processingAttributes.put("snippet-field", "snippet");
+        processingAttributes.put("url-field", "url");
+        processingAttributes.put("fileName", fileName);
+
+        processingAttributes.put(AttributeUtils.getKey(XmlDocumentSource.class, "xml"), 
+            new URLResourceWithParams(new URL(tempDir.toURI().toURL().toExternalForm() + "${fileName}")));
+        processingAttributes.put(AttributeUtils.getKey(XmlDocumentSource.class, "xslt"), xslt);
         final int documentCount = runQuery();
         assertTransformedDocumentsEqual(documentCount);
     }

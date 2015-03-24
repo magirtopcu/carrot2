@@ -328,6 +328,11 @@ public final class Controller implements Closeable
 
             // A copy of the input attributes
             final Map<String, Object> attributesCopy = Maps.newHashMap(attributes);
+            
+            // Special attribute with a view of all input attributes passed to 
+            // components during this request. This key must not be recursive as it causes
+            // stack overflow errors on typical operations (toString, etc.).
+            attributesCopy.put(AttributeNames.ATTRIBUTE_MAP, Collections.unmodifiableMap(attributes));
 
             // A modifiable map into which we'll be collecting all the results
             // Should we preserve unrelated entries from input on the output?
@@ -354,8 +359,7 @@ public final class Controller implements Closeable
                     // instances of @Init @Processing @Input attributes may be created.
                     // See ControllerTestsPooling#testComponentConfigurationInitProcessingAttributeCreation()
                     // for a test case.
-                    ControllerUtils.performProcessing(components[i], attributesCopy,
-                        resultAttributes);
+                    ControllerUtils.performProcessing(components[i], attributesCopy, resultAttributes);
 
                     // Feed the output of this component as the next one's input.
                     attributesCopy.putAll(resultAttributes);
@@ -368,23 +372,22 @@ public final class Controller implements Closeable
                     final long time = componentStop - componentStart;
 
                     // Count only regular processing components, omit wrappers
-                    if (IDocumentSource.class
-                        .isAssignableFrom(configurations[i].componentClass))
+                    if (IDocumentSource.class.isAssignableFrom(configurations[i].componentClass))
                     {
-                        addTime(AttributeNames.PROCESSING_TIME_SOURCE, time,
-                            resultAttributes);
+                        addTime(AttributeNames.PROCESSING_TIME_SOURCE, time, resultAttributes);
                     }
-                    if (IClusteringAlgorithm.class
-                        .isAssignableFrom(configurations[i].componentClass))
+                    if (IClusteringAlgorithm.class.isAssignableFrom(configurations[i].componentClass))
                     {
-                        addTime(AttributeNames.PROCESSING_TIME_ALGORITHM, time,
-                            resultAttributes);
+                        addTime(AttributeNames.PROCESSING_TIME_ALGORITHM, time, resultAttributes);
                     }
                     addTime(AttributeNames.PROCESSING_TIME_TOTAL, time, resultAttributes);
                 }
             }
 
             try {
+                // Make sure we're not propagating the view of all attributes back.
+                resultAttributes.remove(AttributeNames.ATTRIBUTE_MAP);
+
                 processingResult = new ProcessingResult(resultAttributes);
             } catch (IllegalArgumentException e) {
                 throw new ProcessingException(e);

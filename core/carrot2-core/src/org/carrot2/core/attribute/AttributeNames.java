@@ -70,6 +70,12 @@ public final class AttributeNames
      */
     public static final String PROCESSING_RESULT_TITLE = "processing-result.title";
 
+    /**
+     * A special attribute of type <code>Map</code> with all attributes set for the
+     * current request. 
+     */
+    public static final String ATTRIBUTE_MAP = "attribute-map";
+
     /*
      *
      */

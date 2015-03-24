@@ -12,11 +12,8 @@
 
 package org.carrot2.util;
 
-import java.util.*;
-import java.util.Map.Entry;
-
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Utilities for working with {@link Map}s.
@@ -37,35 +34,6 @@ public class MapUtils
         {
             return new HashMap<K, V>(map);
         }
-    }
-
-    /**
-     * Iterates through entries of the input <code>map</code> and for values being String
-     * arrays puts the first element of the map in the result map. Scalar values get
-     * copied to the output map unchanged.
-     * <p>
-     * This method might be useful for "unpacking" values from servlet HTTP requests.
-     */
-    @SuppressWarnings({"rawtypes"})
-    public static Map<String, Object> unpack(final Map map)
-    {
-        final Map<String, Object> result = Maps.newHashMap();
-        for (Object entry : map.entrySet())
-        {
-            final Map.Entry mapEntry = (Entry) entry;
-            final String parameterName = (String) mapEntry.getKey();
-            final String [] parameterValues = (String []) mapEntry.getValue();
-
-            if (parameterValues.length == 1)
-            {
-                result.put(parameterName, parameterValues[0]);
-            }
-            else
-            {
-                result.put(parameterName, Lists.newArrayList(parameterValues));
-            }
-        }
-        return result;
     }
 
     public static <K> Integer increment(Map<K, Integer> map, K key)
