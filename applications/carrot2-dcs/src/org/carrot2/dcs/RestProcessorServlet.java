@@ -17,7 +17,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -67,7 +66,6 @@ import org.carrot2.util.resource.ResourceLookup.Location;
 import org.carrot2.util.resource.ServletContextLocator;
 import org.carrot2.util.xslt.NopURIResolver;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -106,9 +104,11 @@ public final class RestProcessorServlet extends HttpServlet
         InputStream streamOutput = null;
         try
         {
-            streamInput = new ClassResource(RestProcessorServlet.class, "example-input.xml").open();
+            streamInput = new ClassResource(RestProcessorServlet.class,
+                "example-input.xml").open();
             EXAMPLE_INPUT = ProcessingResult.deserialize(streamInput);
-            streamOutput = new ClassResource(RestProcessorServlet.class, "example-output.xml").open();
+            streamOutput = new ClassResource(RestProcessorServlet.class,
+                "example-output.xml").open();
             EXAMPLE_OUTPUT = ProcessingResult.deserialize(streamOutput);
         }
         catch (Exception e)
@@ -185,14 +185,18 @@ public final class RestProcessorServlet extends HttpServlet
         });
 
         // Aliases for clustering commands.
-        CommandAction clusteringAction = new CommandAction() {
+        put("rest", new CommandAction() {
             public void handle(HttpServletRequest request, HttpServletResponse response) throws Exception
             {
                 handleWwwUrlEncoded(request, response);
             }
-        };
-        put("rest", clusteringAction);
-        put("cluster", clusteringAction);
+        });
+        put("cluster", new CommandAction() {
+            public void handle(HttpServletRequest request, HttpServletResponse response) throws Exception
+            {
+                handleWwwUrlEncoded(request, response);
+            }
+        });
     }};
 
     @Override
@@ -416,7 +420,7 @@ public final class RestProcessorServlet extends HttpServlet
             }
             parameters.put(key, request.getParameter(key));
         }
-        processRequest(request, response, input, parameters);
+        processRequest(response, input, parameters);
     }
 
     /**
@@ -478,7 +482,7 @@ public final class RestProcessorServlet extends HttpServlet
             }
         }
 
-        processRequest(request, response, input, parameters);
+        processRequest(response, input, parameters);
     }
 
     /**
@@ -489,17 +493,13 @@ public final class RestProcessorServlet extends HttpServlet
      * @throws IOException
      */
     @SuppressWarnings("unchecked")
-    private void processRequest(HttpServletRequest request,
-                                HttpServletResponse response,
-                                ProcessingResult input, 
-                                final Map<String, Object> parameters) throws IOException
+    private void processRequest(HttpServletResponse response, 
+        ProcessingResult input, final Map<String, Object> parameters) 
+        throws IOException
     {
         // Remove useless parameters, we don't want them to get to the attributes map
         parameters.remove("input-type");
         parameters.remove("submit");
-
-        // Add any HTTP headers prefixed with "http.", the document source may make use of them.
-        addHeaders(request, parameters);
 
         // Bind request parameters to the request model
         final DcsRequestModel requestModel = new DcsRequestModel();
@@ -602,26 +602,6 @@ public final class RestProcessorServlet extends HttpServlet
         catch (Exception e)
         {
             sendInternalServerError("Could not serialize results", response, e);
-        }
-    }
-
-    protected void addHeaders(HttpServletRequest request,
-        final Map<String, Object> parameters)
-    {
-        @SuppressWarnings("unchecked")
-        Enumeration<String> headerNames = request.getHeaderNames();
-        final Joiner joiner = Joiner.on(", ");
-        final List<String> values = new ArrayList<String>();
-        while (headerNames.hasMoreElements()) {
-            String header = headerNames.nextElement();
-            
-            values.clear();
-            @SuppressWarnings("unchecked")
-            Enumeration<String> e = request.getHeaders(header);
-            while (e.hasMoreElements()) {
-                values.add(e.nextElement());
-            }
-            parameters.put("http." + header, joiner.join(values));
         }
     }
 

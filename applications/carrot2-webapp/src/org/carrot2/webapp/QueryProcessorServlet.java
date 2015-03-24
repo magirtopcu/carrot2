@@ -16,11 +16,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,6 +40,7 @@ import org.carrot2.core.ProcessingResult;
 import org.carrot2.core.attribute.AttributeNames;
 import org.carrot2.source.etools.IpBannedException;
 import org.carrot2.text.linguistic.DefaultLexicalDataFactory;
+import org.carrot2.util.MapUtils;
 import org.carrot2.util.attribute.AttributeBinder;
 import org.carrot2.util.attribute.AttributeBinder.IAttributeTransformer;
 import org.carrot2.util.attribute.AttributeUtils;
@@ -70,7 +68,6 @@ import org.simpleframework.xml.core.Persister;
 import org.simpleframework.xml.stream.Format;
 import org.slf4j.Logger;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -210,16 +207,15 @@ public class QueryProcessorServlet extends HttpServlet
             }
         }
     
-        // Unpack HTTP parameters and headers.
-        final Joiner joiner = Joiner.on(", ");
-        final Map<String, Object> requestParameters = new HashMap<>();
-        Enumeration<String> paramNames = request.getParameterNames();
-        while (paramNames.hasMoreElements()) {
-          String key = paramNames.nextElement();
-          requestParameters.put(key, joiner.join(request.getParameterValues(key)));
+        // Unpack parameters from string arrays
+        final Map<String, Object> requestParameters;
+        try {
+            requestParameters = MapUtils.unpack(request.getParameterMap());
+        } catch (Exception e) {
+            logger.info("Skipping, could not parse parameters: " + e.toString());
+            return;
         }
-        addHeaders(request, requestParameters);
-
+    
         // Alias "q" to "query" parameter
         final String queryFromAlias = 
             (String) requestParameters.get(WebappConfig.QUERY_PARAM_ALIAS);
@@ -248,7 +244,7 @@ public class QueryProcessorServlet extends HttpServlet
             
             // Request type is normally bound to the model, but we need to know
             // the type before binding to choose the unknown values resolution strategy
-            final String requestType = (String) requestParameters.get(WebappConfig.TYPE_PARAM);
+            final String requestType = (String)requestParameters.get(WebappConfig.TYPE_PARAM);
             
             final AttributeBinder.AttributeBinderActionBind attributeBinderActionBind = 
                 new AttributeBinder.AttributeBinderActionBind(
@@ -268,7 +264,7 @@ public class QueryProcessorServlet extends HttpServlet
         }
         catch (Exception e)
         {
-            logger.info("Skipping, could not map/bind request model's attributes: "
+            logger.info("Skipping, could not map/bind request model attributes: "
                 + e.toString());
             return;
         }
@@ -282,15 +278,18 @@ public class QueryProcessorServlet extends HttpServlet
                     break;
 
                 case ATTRIBUTES:
-                    handleAttributesRequest(request, response, requestParameters, requestModel);
+                    handleAttributesRequest(request, response, requestParameters,
+                        requestModel);
                     break;
 
                 case SOURCES:
-                    handleSourcesRequest(request, response, requestParameters, requestModel);
+                    handleSourcesRequest(request, response, requestParameters,
+                        requestModel);
                     break;
 
                 default:
-                    handleSearchRequest(request, response, requestParameters, requestModel);
+                    handleSearchRequest(request, response, requestParameters,
+                        requestModel);
             }
         }
         catch (Exception e)
@@ -552,25 +551,6 @@ public class QueryProcessorServlet extends HttpServlet
         }
 
         return result;
-    }
-
-    private void addHeaders(HttpServletRequest request, final Map<String, Object> parameters)
-    {
-        @SuppressWarnings("unchecked")
-        Enumeration<String> headerNames = request.getHeaderNames();
-        final Joiner joiner = Joiner.on(", ");
-        final List<String> values = new ArrayList<String>();
-        while (headerNames.hasMoreElements()) {
-            String header = headerNames.nextElement();
-            
-            values.clear();
-            @SuppressWarnings("unchecked")
-            Enumeration<String> e = request.getHeaders(header);
-            while (e.hasMoreElements()) {
-                values.add(e.nextElement());
-            }
-            parameters.put("http." + header, joiner.join(values));
-        }
     }
 
     /**
